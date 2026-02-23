@@ -105,12 +105,17 @@ export async function onRequest(context) {
      7. FETCH ORIGIN (TÁCH RIÊNG PNG / M4S)
      ========================= */
 
-  let originRes;
+let originRes;
 
+try {
+  originRes = await fetch(originUrl);
+} catch (err) {
+  return new Response("Bad Gateway", { status: 502 });
+}
 
-  if (!originRes.ok) {
-    return new Response("Not found", { status: 404 });
-  }
+if (!originRes.ok) {
+  return new Response("Not found", { status: 404 });
+}
 
   /* =========================
      8. RESPONSE + CACHE
