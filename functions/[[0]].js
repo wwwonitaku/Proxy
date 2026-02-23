@@ -82,8 +82,10 @@ export async function onRequest(context) {
 
   let videoId;
 
-  if (isM3u8 || isJPG || isVTT) {
+  if (isM3u8) {
     videoId = pathname.slice(0, -5);
+  } else if (isJPG || isVTT) {
+    videoId = pathname.slice(0, -4);
   } else if (isPng) {
     const match = pathname.match(/^((?:tv|mv)-\d+-\d+-\d+)-index/i);
     if (!match) {
