@@ -8,7 +8,7 @@ export async function onRequest(context) {
   const url = new URL(request.url);
 
   /* =========================
-     0. CACHE KEY (URL ONLY)
+     0. CACHE KEY
      ========================= */
 
   const cacheKey = new Request(url.toString(), { method: "GET" });
@@ -16,7 +16,7 @@ export async function onRequest(context) {
   if (cached) return cached;
 
   /* =========================
-     1. PATH CHECK
+     1. PATH
      ========================= */
 
   const pathname = url.pathname.replace(/^\/+/, "");
@@ -30,6 +30,10 @@ export async function onRequest(context) {
   const isPng  = lower.endsWith(".png");
   const isJPG  = lower.endsWith(".jpg");
   const isVTT  = lower.endsWith(".vtt");
+
+  if (!(isM3u8 || isPng || isJPG || isVTT)) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   /* =========================
      2. REFERER PROTECTION
@@ -77,24 +81,16 @@ export async function onRequest(context) {
   }
 
   /* =========================
-     5. VIDEO ID
+     5. VIDEO ID (4 segment đầu)
      ========================= */
 
-  let videoId;
+  const idMatch = pathname.match(/^(tv|mv)-(\d+)-(\d+)-(\d+)/i);
 
-  if (isM3u8) {
-    videoId = pathname.slice(0, -5);
-  } else if (isJPG || isVTT) {
-    videoId = pathname.slice(0, -4);
-  } else if (isPng) {
-    const match = pathname.match(/^((?:tv|mv)-\d+-\d+-\d+)-index/i);
-    if (!match) {
-      return new Response("Forbidden", { status: 403 });
-    }
-    videoId = match[1];
-  } else {
+  if (!idMatch) {
     return new Response("Forbidden", { status: 403 });
   }
+
+  const videoId = `${idMatch[1]}-${idMatch[2]}-${idMatch[3]}-${idMatch[4]}`;
 
   /* =========================
      6. ORIGIN URL
@@ -104,20 +100,20 @@ export async function onRequest(context) {
     `https://${videoId}.x${shardId}-vicdn-cc.pages.dev/${pathname}`;
 
   /* =========================
-     7. FETCH ORIGIN (TÁCH RIÊNG PNG / M4S)
+     7. FETCH ORIGIN
      ========================= */
 
-let originRes;
+  let originRes;
 
-try {
-  originRes = await fetch(originUrl);
-} catch (err) {
-  return new Response("Bad Gateway", { status: 502 });
-}
+  try {
+    originRes = await fetch(originUrl);
+  } catch {
+    return new Response("Bad Gateway", { status: 502 });
+  }
 
-if (!originRes.ok) {
-  return new Response("Not found", { status: 404 });
-}
+  if (!originRes.ok) {
+    return new Response("Not found", { status: 404 });
+  }
 
   /* =========================
      8. RESPONSE + CACHE
@@ -131,9 +127,10 @@ if (!originRes.ok) {
   );
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Access-Control-Allow-Origin", "*");
- 
+
   if (res.status === 200) {
-  await cache.put(cacheKey, res.clone());
+    await cache.put(cacheKey, res.clone());
   }
+
   return res;
 }
